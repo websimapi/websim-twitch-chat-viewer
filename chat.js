@@ -63,6 +63,8 @@
   const ttsFilterToggleButton = document.getElementById('tts-filter-toggle');
   const autoAddUserToggle = document.getElementById('auto-add-user-toggle');
   const customCommandsBtn = document.getElementById('custom-commands-btn');
+  // New AI Chat Settings button (opens the modal)
+  const aiChatSettingsBtn = document.getElementById('ai-chat-settings-btn');
 
   // TTS State with localStorage support
   const ttsState = {
@@ -87,6 +89,12 @@
   };
   // Load gamble triggers from localStorage or use default triggers
   let gambleTriggers = JSON.parse(localStorage.getItem('gambleTriggers') || JSON.stringify(defaultGambleTriggers));
+
+  // AI Chat settings variables
+  let aiChatEnabled = localStorage.getItem("aiChatEnabled") === 'false' ? false : true;
+  let aiChatInterval = parseInt(localStorage.getItem("aiChatInterval")) || 180; // default 180 seconds
+  let aiChatVoice = localStorage.getItem("aiChatVoice") || ""; // selected TTS voice for AI responses
+  let aiChatTimer = null;
 
   // Function to extract title and author from URL (mock implementation)
   async function getMediaInfo(url) {
@@ -194,6 +202,14 @@
     ttsVoiceSelect.innerHTML = voices.map(voice => 
       `<option value="${voice.name}">${voice.name} (${voice.lang})</option>`
     ).join('');
+
+    // Also populate AI Chat voice select if the modal exists
+    const aiChatVoiceSelect = document.getElementById('ai-chat-voice-select');
+    if (aiChatVoiceSelect) {
+      aiChatVoiceSelect.innerHTML = voices.map(voice => 
+        `<option value="${voice.name}" ${voice.name === aiChatVoice ? 'selected' : ''}>${voice.name} (${voice.lang})</option>`
+      ).join('');
+    }
   }
 
   // Load TTS state from localStorage and update UI
@@ -333,6 +349,8 @@
     updateTTSUsersList();
   }
   window.toggleMuteUser = toggleMuteUser;
+  window.removeTTSUser = removeTTSUser;
+  window.updateUserVoice = updateUserVoice;
 
   function clearTTSQueue() {
     ttsState.queue = [];
@@ -396,7 +414,6 @@
       if (voice) {
         utterance.voice = voice;
       }
-
       utterance.rate = 1;
       utterance.pitch = 1;
       utterance.volume = 1;
@@ -739,19 +756,6 @@
     }
   });
 
-  // Expose a function to reload TTS-related settings without a page reload.
-  window.reloadChatSettings = function() {
-    loadTTSState();
-    updateTTSUsersList();
-    if (window.loadAIChatSettings) {
-      window.loadAIChatSettings();
-    }
-  };
-
-  // Expose functions to be used in inline event handlers
-  window.removeTTSUser = removeTTSUser;
-  window.updateUserVoice = updateUserVoice;
-
   // ---------- AI Chat Functionality ----------
   // Global buffer for recent chat messages (max 1000 characters)
   let aiChatBuffer = "";
@@ -762,22 +766,13 @@
     }
   }
 
-  // Retrieve AI Chat settings from localStorage
-  let aiChatEnabled = localStorage.getItem("aiChatEnabled");
-  if (aiChatEnabled === null) {
-    aiChatEnabled = true;
-  } else {
-    aiChatEnabled = (aiChatEnabled === 'true');
-  }
-  let aiChatInterval = parseInt(localStorage.getItem("aiChatInterval")) || 180; // default 180 seconds
-  let aiChatTimer = null;
-
+  // Process AI Chat using the language model and add response to TTS queue using selected voice.
   async function processAIChat() {
     if (!aiChatEnabled || aiChatBuffer.trim().length === 0) return;
     const chatContext = aiChatBuffer.trim();
-    // Reset the buffer to avoid reprocessing
+    // Reset the buffer
     aiChatBuffer = "";
-    // Ensure we only send up to 1000 characters
+    // Truncate context to 1000 characters if needed
     const truncatedContext = chatContext.slice(0, 1000);
     const promptText = "Based on the following recent chat messages, generate a brief summary and commentary for TTS (max 100 words):\n" + truncatedContext;
     try {
@@ -791,12 +786,19 @@
       });
       const result = await response.json();
       const aiMessage = result.message || "No response from AI.";
-      queueTTSMessage(aiMessage, "AI Chat");
+      // Use the selected AI Chat voice when queueing the response
+      if (aiChatVoice) {
+        queueCustomTTSMessage(aiMessage, aiChatVoice, "AI Chat");
+      } else {
+        // Fallback: use default queueTTSMessage if no voice is selected
+        queueTTSMessage(aiMessage, "AI Chat");
+      }
     } catch (error) {
       console.error("Error processing AI Chat:", error);
     }
   }
 
+  // Start AI Chat timer based on the interval setting
   function startAIChatTimer() {
     if (aiChatTimer) clearInterval(aiChatTimer);
     if (aiChatEnabled) {
@@ -804,42 +806,80 @@
     }
   }
 
-  function loadAIChatSettings() {
-    const aiChatToggleBtn = document.getElementById("ai-chat-toggle");
-    const aiChatIntervalInput = document.getElementById("ai-chat-interval");
-    aiChatToggleBtn.textContent = aiChatEnabled ? "AI Chat Enabled" : "AI Chat Disabled";
-    aiChatToggleBtn.classList.toggle("off", !aiChatEnabled);
+  // ---------- AI Chat Modal Functionality ----------
+  // Load AI Chat settings into the modal
+  function loadAIChatModalSettings() {
+    const aiChatEnabledBtn = document.getElementById('ai-chat-enabled');
+    const aiChatIntervalInput = document.getElementById('ai-chat-interval');
+    const aiChatVoiceSelect = document.getElementById('ai-chat-voice-select');
+    aiChatEnabledBtn.textContent = aiChatEnabled ? "AI Chat Enabled" : "AI Chat Disabled";
+    aiChatEnabledBtn.classList.toggle("off", !aiChatEnabled);
     aiChatIntervalInput.value = aiChatInterval;
+    // Populate voice select if voices are available (reuse populateVoiceList logic)
+    const voices = tts.getVoices();
+    if (voices.length && aiChatVoiceSelect) {
+      aiChatVoiceSelect.innerHTML = voices.map(voice => 
+        `<option value="${voice.name}" ${voice.name === aiChatVoice ? 'selected' : ''}>${voice.name} (${voice.lang})</option>`
+      ).join('');
+    }
   }
-  window.loadAIChatSettings = loadAIChatSettings;
+  window.loadAIChatModalSettings = loadAIChatModalSettings;
 
-  function saveAIChatSettings() {
+  function saveAIChatModalSettings() {
+    const aiChatEnabledBtn = document.getElementById('ai-chat-enabled');
+    const aiChatIntervalInput = document.getElementById('ai-chat-interval');
+    const aiChatVoiceSelect = document.getElementById('ai-chat-voice-select');
+    // Toggle state based on button text/class
+    aiChatEnabled = !aiChatEnabledBtn.classList.contains("off") ? true : false;
+    aiChatInterval = parseInt(aiChatIntervalInput.value) || 180;
+    aiChatVoice = aiChatVoiceSelect.value;
     localStorage.setItem("aiChatEnabled", aiChatEnabled);
     localStorage.setItem("aiChatInterval", aiChatInterval);
+    localStorage.setItem("aiChatVoice", aiChatVoice);
     startAIChatTimer();
   }
 
-  // Initialize AI Chat settings and start timer
-  loadAIChatSettings();
-  startAIChatTimer();
-
-  // Event listeners for AI Chat controls
-  const aiChatToggleBtn = document.getElementById("ai-chat-toggle");
-  const aiChatIntervalInput = document.getElementById("ai-chat-interval");
-  const triggerAIChatBtn = document.getElementById("trigger-ai-chat");
-
-  aiChatToggleBtn.addEventListener("click", () => {
-    aiChatEnabled = !aiChatEnabled;
-    aiChatToggleBtn.textContent = aiChatEnabled ? "AI Chat Enabled" : "AI Chat Disabled";
-    aiChatToggleBtn.classList.toggle("off", !aiChatEnabled);
-    saveAIChatSettings();
-  });
-
-  aiChatIntervalInput.addEventListener("change", (e) => {
-    aiChatInterval = parseInt(e.target.value) || 180;
-    saveAIChatSettings();
-  });
-
-  triggerAIChatBtn.addEventListener("click", processAIChat);
+  // Event listener for AI Chat Modal save button and toggle
+  const aiChatModalSaveBtn = document.getElementById('save-ai-chat-settings');
+  if (aiChatModalSaveBtn) {
+    aiChatModalSaveBtn.addEventListener("click", () => {
+      saveAIChatModalSettings();
+      document.getElementById('ai-chat-modal').style.display = 'none';
+    });
+  }
+  const aiChatTriggerBtn = document.getElementById("trigger-ai-chat");
+  if (aiChatTriggerBtn) {
+    aiChatTriggerBtn.addEventListener("click", processAIChat);
+  }
+  const aiChatEnabledBtn = document.getElementById('ai-chat-enabled');
+  if (aiChatEnabledBtn) {
+    aiChatEnabledBtn.addEventListener("click", () => {
+      aiChatEnabled = !aiChatEnabled;
+      aiChatEnabledBtn.textContent = aiChatEnabled ? "AI Chat Enabled" : "AI Chat Disabled";
+      aiChatEnabledBtn.classList.toggle("off", !aiChatEnabled);
+    });
+  }
+  const aiChatModalCloseBtn = document.getElementById('close-ai-chat-btn');
+  if (aiChatModalCloseBtn) {
+    aiChatModalCloseBtn.addEventListener('click', () => {
+      document.getElementById('ai-chat-modal').style.display = 'none';
+    });
+  }
+  // Open AI Chat Modal when button is clicked
+  if (aiChatSettingsBtn) {
+    aiChatSettingsBtn.addEventListener('click', () => {
+      document.getElementById('ai-chat-modal').style.display = 'block';
+      loadAIChatModalSettings();
+    });
+  }
   // ---------- End AI Chat Functionality ----------
+
+  // Expose a function to reload TTS-related settings without a page reload.
+  window.reloadChatSettings = function() {
+    loadTTSState();
+    updateTTSUsersList();
+    if (window.loadAIChatModalSettings) {
+      window.loadAIChatModalSettings();
+    }
+  };
 })();

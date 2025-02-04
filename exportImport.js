@@ -67,9 +67,9 @@
           autoAddUserEnabled = autoAddUserEnabled === null ? true : autoAddUserEnabled === 'true';
           autoAddUserToggle.textContent = autoAddUserEnabled ? 'Auto Add User: On' : 'Auto Add User: Off';
         }
-        // Update AI Chat Settings UI if available
-        if (window.loadAIChatSettings) {
-          window.loadAIChatSettings();
+        // Update AI Chat Modal if available
+        if (window.loadAIChatModalSettings) {
+          window.loadAIChatModalSettings();
         }
         // Update Custom Commands UI if available
         if (window.loadCustomCommands) {

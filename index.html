@@ -472,27 +472,12 @@
     .add-custom-command-btn:hover {
       background: #218838;
     }
-    /* AI Chat Settings */
-    #ai-chat-settings {
-      margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background: #f8f9fa;
+    /* AI Chat Modal Specific */
+    .ai-chat-btn {
+      background: #17a2b8;
     }
-    #ai-chat-settings h3 {
-      margin-top: 0;
-      margin-bottom: 10px;
-      color: #333;
-    }
-    #ai-chat-settings label {
-      font-size: 0.9em;
-      color: #333;
-    }
-    #ai-chat-settings input[type="number"] {
-      width: 80px;
-      padding: 4px;
-      margin-left: 5px;
+    .ai-chat-btn:hover {
+      background: #138496;
     }
   </style>
 </head>
@@ -517,6 +502,8 @@
         <button id="auto-add-user-toggle" class="control-btn toggle-btn">Auto Add User: On</button>
         <button id="custom-commands-btn" class="control-btn add-btn">Custom Commands</button>
         <button id="export-import-settings-btn" class="control-btn add-btn">Export/Import Settings</button>
+        <!-- New AI Chat Settings Button -->
+        <button id="ai-chat-settings-btn" class="control-btn ai-chat-btn">AI Chat Settings</button>
       </div>
 
       <!-- Gamble Settings Modal -->
@@ -577,6 +564,31 @@
         </div>
       </div>
 
+      <!-- AI Chat Modal -->
+      <div id="ai-chat-modal" class="modal">
+        <div class="modal-content">
+          <h4>AI Chat Settings</h4>
+          <div class="settings-form">
+            <button id="ai-chat-enabled" class="control-btn toggle-btn">AI Chat Enabled</button>
+            <label>
+              Interval (seconds):
+              <input type="number" id="ai-chat-interval" value="180" min="10">
+            </label>
+            <label>
+              TTS Voice for AI Response:
+              <select id="ai-chat-voice-select">
+                <!-- Options populated dynamically -->
+              </select>
+            </label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button id="trigger-ai-chat" class="control-btn add-btn">Trigger AI Chat Now</button>
+              <button id="save-ai-chat-settings" class="control-btn add-btn">Save Settings</button>
+              <button id="close-ai-chat-btn" class="control-btn clear-btn">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form id="tts-add-form">
         <input type="text" id="tts-username" placeholder="Enter username for TTS">
         <select id="tts-voice-select">
@@ -600,18 +612,6 @@
           <div id="tts-queue-display" class="queue-display">
             <div class="empty-queue">Queue is empty</div>
           </div>
-        </div>
-      </div>
-      
-      <!-- AI Chat Settings -->
-      <div id="ai-chat-settings">
-        <h3>AI Chat Settings</h3>
-        <div style="display: flex; align-items: center; gap:10px; flex-wrap: wrap;">
-          <button id="ai-chat-toggle" class="control-btn toggle-btn">AI Chat Enabled</button>
-          <label>
-            Interval (seconds): <input type="number" id="ai-chat-interval" value="180" min="10">
-          </label>
-          <button id="trigger-ai-chat" class="control-btn add-btn">Trigger AI Chat Now</button>
         </div>
       </div>
     </div>
